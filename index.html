@@ -103,9 +103,7 @@
     outline: none;
     font-family: var(--font-sans);
   }
-  .param-block input[type=number]:focus {
-    border-color: var(--color-border-primary);
-  }
+  .param-block input[type=number]:focus { border-color: var(--color-border-primary); }
   .stats-row {
     display: flex;
     gap: 8px;
@@ -120,7 +118,7 @@
     min-width: 80px;
   }
   .stat-card .label { font-size: 11px; color: var(--color-text-secondary); }
-  .stat-card .val { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+  .stat-card .val   { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
   .controls-row {
     display: flex;
     align-items: center;
@@ -141,10 +139,7 @@
   }
   .controls-row button:hover { background: var(--color-background-secondary); }
   .controls-row button.primary { border-color: #1D9E75; color: #0F6E56; }
-  #apply-btn {
-    background: #E1F5EE; color: #0F6E56;
-    border-color: #5DCAA5; font-weight: 500;
-  }
+  #apply-btn { background: #E1F5EE; color: #0F6E56; border-color: #5DCAA5; font-weight: 500; }
   #apply-btn:hover { background: #9FE1CB; }
   .speed-wrap {
     display: flex; align-items: center; gap: 6px;
@@ -177,19 +172,19 @@
   <div class="params-grid">
     <div class="param-block">
       <label>number of philosophers</label>
-      <input type="number" id="p-n" value="4" min="1" max="12">
+      <input type="number" id="p-n" value="5" min="1" max="12">
     </div>
     <div class="param-block">
       <label>time to die (ms)</label>
-      <input type="number" id="p-die" value="410" min="10" max="5000">
+      <input type="number" id="p-die" value="155" min="10" max="5000">
     </div>
     <div class="param-block">
       <label>time to eat (ms)</label>
-      <input type="number" id="p-eat" value="200" min="5" max="2000">
+      <input type="number" id="p-eat" value="100" min="5" max="2000">
     </div>
     <div class="param-block">
       <label>time to sleep (ms)</label>
-      <input type="number" id="p-slp" value="200" min="5" max="2000">
+      <input type="number" id="p-slp" value="50" min="5" max="2000">
     </div>
   </div>
 
@@ -220,7 +215,7 @@
 <script>
 (function(){
   const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d');
+  const ctx    = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   const CX = W/2, CY = H/2 - 4;
 
@@ -229,203 +224,317 @@
   const SBG_L  = ['#F1EFE8','#E6F1FB','#E1F5EE','#EEEDFE','#FCEBEB'];
   const SBG_D  = ['#2C2C2A','#042C53','#04342C','#26215C','#501313'];
 
-  let N=4, T_DIE=410, T_EAT=200, T_SLP=200;
+  let N=5, T_DIE=155, T_EAT=100, T_SLP=50;
   let simTime=0, lastReal=null, running=false, dead=false, animId=null;
   let totalMeals=0;
   let philos=[], forks=[];
 
+  /* ── speed multiplier ─────────────────────────────────────────── */
   function speedMult(){
     const s = parseInt(document.getElementById('speed').value);
     return s <= 5 ? s * 0.25 : (s - 4) * 1.0;
   }
+
+  /* ── geometry ─────────────────────────────────────────────────── */
   function angleOf(i){ return -Math.PI/2 + 2*Math.PI*i/N; }
   function R_TABLE(){ return Math.min(110, 80 + (12-N)*4); }
   function R_PHILO(){ return R_TABLE()+40; }
   function R_FORK_R(){ return R_TABLE()-28; }
 
-  function initSim(){
-    simTime=0; lastReal=null; running=false; dead=false; totalMeals=0;
-    document.getElementById('log-box').innerHTML='';
-    forks = Array.from({length:N},(_,i)=>({held:false,holder:-1,i}));
-    philos = Array.from({length:N},(_,i)=>{
-      const a=angleOf(i);
-      return { id:i+1, state:0, stateTimer:0, lastMeal:0, meals:0, angle:a, pulseT:0,
-               x:CX+R_PHILO()*Math.cos(a), y:CY+R_PHILO()*Math.sin(a) };
-    });
-    updateStats(); render();
-  }
-
-  function addLog(ms,id,msg,cls){
-    const box=document.getElementById('log-box');
-    const d=document.createElement('div');
-    d.className=cls;
-    d.textContent=Math.round(ms)+'ms  '+id+'  '+msg;
-    box.appendChild(d);
-    if(box.children.length>300) box.removeChild(box.firstChild);
-    box.scrollTop=box.scrollHeight;
-  }
-
+  /* ── fork index helpers ───────────────────────────────────────── */
   function forkL(i){ return (i+N-1)%N; }
   function forkR(i){ return i; }
 
+  /* ── init ─────────────────────────────────────────────────────── */
+  function initSim(){
+    simTime=0; lastReal=null; running=false; dead=false; totalMeals=0;
+    document.getElementById('log-box').innerHTML='';
+
+    /*
+     * FIX 4 — forks track their holder index.
+     * This prevents a philosopher from releasing a fork
+     * that already belongs to someone else in the same tick.
+     */
+    forks = Array.from({length:N}, (_,i) => ({ held:false, holder:-1, i }));
+
+    philos = Array.from({length:N}, (_,i) => {
+      const a = angleOf(i);
+      return {
+        id: i+1,
+        state: 0,        // 0=thinking 1=waiting 2=eating 3=sleeping 4=dead
+        stateTimer: 0,
+        lastMeal: 0,
+        meals: 0,
+        angle: a,
+        pulseT: 0,
+        x: CX + R_PHILO()*Math.cos(a),
+        y: CY + R_PHILO()*Math.sin(a),
+        /*
+         * FIX 3 — staggering.
+         * Even-id philosophers start with a small head-start delay,
+         * mirroring the ft_usleep(time_eat/10) in routine.c.
+         * This staggers the initial fork grabs so adjacent philosophers
+         * don't all compete at t=0.
+         */
+        startDelay: (i % 2 === 1) ? T_EAT / 10 : 0,
+      };
+    });
+
+    updateStats();
+    render();
+  }
+
+  /* ── logging ──────────────────────────────────────────────────── */
+  function addLog(ms, id, msg, cls){
+    const box = document.getElementById('log-box');
+    const d   = document.createElement('div');
+    d.className  = cls;
+    d.textContent = Math.round(ms)+'ms  '+id+'  '+msg;
+    box.appendChild(d);
+    if(box.children.length > 300) box.removeChild(box.firstChild);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  /* ── simulation step ──────────────────────────────────────────── */
   function tick(dtReal){
     if(dead) return;
-    const dt=dtReal*speedMult();
-    simTime+=dt;
 
-    philos.forEach((p,i)=>{
-      if(p.state===4) return;
-      p.stateTimer+=dt; p.pulseT+=dt;
+    const dtSim    = dtReal * speedMult();
+    const SUBSTEP  = 1;   // ms — subtick resolution
+    const steps    = Math.max(1, Math.round(dtSim / SUBSTEP));
+    const stepSize = dtSim / steps;
 
-      if(simTime-p.lastMeal >= T_DIE){
-        p.state=4; dead=true; running=false;
-        addLog(simTime,p.id,'died','l-die');
-        forks[forkL(i)].held=false; forks[forkR(i)].held=false;
-        const ss=document.getElementById('s-status');
-        ss.textContent='died'; ss.style.color='#E24B4A';
+    /*
+     * FIX 1 — subdivide each frame into 1 ms subticks.
+     * requestAnimationFrame fires ~every 16.7 ms.
+     * With T_DIE=155, T_EAT=100, T_SLP=50, the survival window
+     * is only 5 ms — invisible at 16.7 ms resolution.
+     * By running steps of 1 ms we never skip over that window.
+     */
+    for(let s = 0; s < steps; s++){
+      if(dead) break;
+      simTime += stepSize;
+      stepPhilos(stepSize);
+    }
+
+    updateStats();
+    render();
+  }
+
+  function stepPhilos(dt){
+    philos.forEach((p, i) => {
+      if(p.state === 4) return;
+
+      /* honour start delay — odd philosophers wait before first fork grab */
+      if(p.startDelay > 0){
+        p.startDelay -= dt;
+        p.pulseT     += dt;
         return;
       }
 
-      if(p.state===0||p.state===1){
-        const fl=forkL(i), fr=forkR(i);
-        if(!forks[fl].held&&!forks[fr].held){
-          forks[fl].held=true; forks[fr].held=true;
-          p.state=2; p.stateTimer=0; p.lastMeal=simTime;
-          addLog(simTime,p.id,'has taken a fork','l-fork');
-          addLog(simTime,p.id,'has taken a fork','l-fork');
-          addLog(simTime,p.id,'is eating','l-eat');
-        } else { p.state=1; }
-      } else if(p.state===2&&p.stateTimer>=T_EAT){
-        forks[forkL(i)].held=false; forks[forkR(i)].held=false;
-        p.meals++; totalMeals++;
-        p.state=3; p.stateTimer=0;
-        addLog(simTime,p.id,'is sleeping','l-sleep');
-      } else if(p.state===3&&p.stateTimer>=T_SLP){
-        p.state=0; p.stateTimer=0;
-        addLog(simTime,p.id,'is thinking','l-think');
+      p.stateTimer += dt;
+      p.pulseT     += dt;
+
+      /*
+       * FIX 2 — try to eat BEFORE the death check.
+       * In the real C program, eating and the death observer run in
+       * parallel. A philosopher that manages to grab both forks resets
+       * lastMeal before the observer can declare them dead.
+       * We replicate that by attempting the fork grab first.
+       */
+      if(p.state === 0 || p.state === 1){
+        const fl = forkL(i), fr = forkR(i);
+
+        /*
+         * FIX 4 — only grab if neither fork is held by anyone.
+         * Also stamp the holder index so release is unambiguous.
+         */
+        if(!forks[fl].held && !forks[fr].held){
+          forks[fl].held = true;  forks[fl].holder = i;
+          forks[fr].held = true;  forks[fr].holder = i;
+          p.state      = 2;
+          p.stateTimer = 0;
+          p.lastMeal   = simTime;   // reset hunger timer before death check
+          addLog(simTime, p.id, 'has taken a fork', 'l-fork');
+          addLog(simTime, p.id, 'has taken a fork', 'l-fork');
+          addLog(simTime, p.id, 'is eating',        'l-eat');
+        } else {
+          p.state = 1;  // waiting
+        }
+      }
+
+      /* death check — runs AFTER the fork-grab attempt */
+      if(simTime - p.lastMeal >= T_DIE){
+        p.state  = 4;
+        dead     = true;
+        running  = false;
+        addLog(simTime, p.id, 'died', 'l-die');
+        /* FIX 4 — only release forks that this philosopher actually holds */
+        if(forks[forkL(i)].holder === i){ forks[forkL(i)].held = false; forks[forkL(i)].holder = -1; }
+        if(forks[forkR(i)].holder === i){ forks[forkR(i)].held = false; forks[forkR(i)].holder = -1; }
+        const ss = document.getElementById('s-status');
+        ss.textContent = 'died'; ss.style.color = '#E24B4A';
+        return;
+      }
+
+      if(p.state === 2 && p.stateTimer >= T_EAT){
+        /* FIX 4 — release only own forks */
+        if(forks[forkL(i)].holder === i){ forks[forkL(i)].held = false; forks[forkL(i)].holder = -1; }
+        if(forks[forkR(i)].holder === i){ forks[forkR(i)].held = false; forks[forkR(i)].holder = -1; }
+        p.meals++;
+        totalMeals++;
+        p.state      = 3;
+        p.stateTimer = 0;
+        addLog(simTime, p.id, 'is sleeping', 'l-sleep');
+      } else if(p.state === 3 && p.stateTimer >= T_SLP){
+        p.state      = 0;
+        p.stateTimer = 0;
+        addLog(simTime, p.id, 'is thinking', 'l-think');
       }
     });
-
-    updateStats(); render();
   }
 
+  /* ── stats ────────────────────────────────────────────────────── */
   function updateStats(){
-    document.getElementById('s-time').textContent=Math.round(simTime)+' ms';
-    document.getElementById('s-meals').textContent=totalMeals;
+    document.getElementById('s-time').textContent  = Math.round(simTime)+' ms';
+    document.getElementById('s-meals').textContent = totalMeals;
   }
 
+  /* ── render ───────────────────────────────────────────────────── */
   function render(){
     ctx.clearRect(0,0,W,H);
-    const dark=window.matchMedia('(prefers-color-scheme:dark)').matches;
-    const tFill  =dark?'#2C2C2A':'#F1EFE8';
-    const tStroke=dark?'#5F5E5A':'#B4B2A9';
-    const tSec   =dark?'#9c9a92':'#73726c';
-    const RT=R_TABLE(), RP=R_PHILO(), RF=R_FORK_R();
+    const dark     = window.matchMedia('(prefers-color-scheme:dark)').matches;
+    const tFill    = dark ? '#2C2C2A' : '#F1EFE8';
+    const tStroke  = dark ? '#5F5E5A' : '#B4B2A9';
+    const RT = R_TABLE(), RF = R_FORK_R();
 
+    /* table */
     ctx.beginPath(); ctx.arc(CX,CY,RT,0,Math.PI*2);
-    ctx.fillStyle=tFill; ctx.fill();
-    ctx.strokeStyle=tStroke; ctx.lineWidth=1; ctx.stroke();
-    ctx.font='14px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText('🍝',CX,CY);
+    ctx.fillStyle = tFill; ctx.fill();
+    ctx.strokeStyle = tStroke; ctx.lineWidth = 1; ctx.stroke();
+    ctx.font = '14px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🍝', CX, CY);
 
-    forks.forEach((f,i)=>{
-      const aL=angleOf(i), aR=angleOf((i+1)%N);
-      let aM=(aL+aR)/2;
-      if(Math.abs(aR-aL)>Math.PI) aM+=Math.PI;
-      const fx=CX+RF*Math.cos(aM), fy=CY+RF*Math.sin(aM);
+    /* forks */
+    forks.forEach((f,i) => {
+      const aL = angleOf(i), aR = angleOf((i+1)%N);
+      let aM = (aL+aR)/2;
+      if(Math.abs(aR-aL) > Math.PI) aM += Math.PI;
+      const fx = CX+RF*Math.cos(aM), fy = CY+RF*Math.sin(aM);
       ctx.save(); ctx.translate(fx,fy); ctx.rotate(aM+Math.PI/2);
-      const fc=f.held?'#1D9E75':(dark?'#5F5E5A':'#B4B2A9');
-      ctx.strokeStyle=fc; ctx.lineWidth=f.held?2.5:1.5; ctx.lineCap='round';
-      ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(0,9); ctx.stroke();
+      const fc = f.held ? '#1D9E75' : (dark ? '#5F5E5A' : '#B4B2A9');
+      ctx.strokeStyle = fc; ctx.lineWidth = f.held ? 2.5 : 1.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(0,9);   ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-3,-9); ctx.lineTo(-3,-2); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(3,-9); ctx.lineTo(3,-2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(3,-9);  ctx.lineTo(3,-2);  ctx.stroke();
       ctx.restore();
     });
 
-    philos.forEach((p,i)=>{
-      const pulse=p.state===2?1+0.07*Math.sin(p.pulseT/60):1;
-      const r=20*pulse;
-      const bg=dark?SBG_D[p.state]:SBG_L[p.state];
-      const bc=SCOLOR[p.state];
+    /* philosophers */
+    philos.forEach((p) => {
+      const pulse = p.state===2 ? 1+0.07*Math.sin(p.pulseT/60) : 1;
+      const r     = 20*pulse;
+      const bg    = dark ? SBG_D[p.state] : SBG_L[p.state];
+      const bc    = SCOLOR[p.state];
 
       ctx.beginPath(); ctx.arc(p.x,p.y,r+2.5,0,Math.PI*2);
-      ctx.fillStyle=bc; ctx.fill();
+      ctx.fillStyle = bc; ctx.fill();
       ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
-      ctx.fillStyle=bg; ctx.fill();
+      ctx.fillStyle = bg; ctx.fill();
 
-      const hunger=Math.max(0,1-(simTime-p.lastMeal)/T_DIE);
-      const barW=34, bx=p.x-barW/2, by=p.y-r-8;
-      ctx.fillStyle=dark?'#444441':'#D3D1C7';
-      ctx.fillRect(bx,by,barW,3);
-      const hc=hunger<0.25?'#E24B4A':hunger<0.5?'#EF9F27':'#1D9E75';
-      ctx.fillStyle=hc;
-      ctx.fillRect(bx,by,barW*hunger,3);
+      /* hunger bar */
+      const hunger = Math.max(0, 1-(simTime-p.lastMeal)/T_DIE);
+      const barW = 34, bx = p.x-barW/2, by = p.y-r-8;
+      ctx.fillStyle = dark ? '#444441' : '#D3D1C7';
+      ctx.fillRect(bx, by, barW, 3);
+      const hc = hunger<0.25 ? '#E24B4A' : hunger<0.5 ? '#EF9F27' : '#1D9E75';
+      ctx.fillStyle = hc;
+      ctx.fillRect(bx, by, barW*hunger, 3);
 
-      if(p.state===2){
-        const prog=Math.min(1,p.stateTimer/T_EAT);
-        ctx.fillStyle=dark?'#444441':'#D3D1C7';
-        ctx.fillRect(bx,by+6,barW,2);
-        ctx.fillStyle='#1D9E75';
-        ctx.fillRect(bx,by+6,barW*prog,2);
-      } else if(p.state===1){
-        const sz=Math.sin(p.pulseT/120)*0.5+0.5;
-        ctx.fillStyle=dark?'#444441':'#D3D1C7';
-        ctx.fillRect(bx,by+6,barW,2);
-        ctx.fillStyle='#378ADD';
-        ctx.fillRect(bx,by+6,barW*sz,2);
+      /* action progress bar */
+      if(p.state === 2){
+        const prog = Math.min(1, p.stateTimer/T_EAT);
+        ctx.fillStyle = dark ? '#444441' : '#D3D1C7';
+        ctx.fillRect(bx, by+6, barW, 2);
+        ctx.fillStyle = '#1D9E75';
+        ctx.fillRect(bx, by+6, barW*prog, 2);
+      } else if(p.state === 1){
+        const sz = Math.sin(p.pulseT/120)*0.5+0.5;
+        ctx.fillStyle = dark ? '#444441' : '#D3D1C7';
+        ctx.fillRect(bx, by+6, barW, 2);
+        ctx.fillStyle = '#378ADD';
+        ctx.fillRect(bx, by+6, barW*sz, 2);
       }
 
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.font=`500 ${N>8?10:12}px var(--font-sans,sans-serif)`;
-      ctx.fillStyle=bc;
-      ctx.fillText(p.id,p.x,p.y-3);
-      ctx.font=`400 9px var(--font-sans,sans-serif)`;
-      ctx.fillText(SLABEL[p.state],p.x,p.y+8);
+      /* labels */
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `500 ${N>8?10:12}px var(--font-sans,sans-serif)`;
+      ctx.fillStyle = bc;
+      ctx.fillText(p.id, p.x, p.y-3);
+      ctx.font = `400 9px var(--font-sans,sans-serif)`;
+      ctx.fillText(SLABEL[p.state], p.x, p.y+8);
     });
 
     if(dead){
-      ctx.font='500 13px var(--font-sans,sans-serif)';
-      ctx.textAlign='center'; ctx.fillStyle='#E24B4A';
-      ctx.fillText('Simulation ended — a philosopher died',CX,CY+RT+26);
+      ctx.font = '500 13px var(--font-sans,sans-serif)';
+      ctx.textAlign = 'center'; ctx.fillStyle = '#E24B4A';
+      ctx.fillText('Simulation ended — a philosopher died', CX, CY+RT+26);
     }
   }
 
+  /* ── animation loop ───────────────────────────────────────────── */
   function loop(ts){
     if(!running) return;
-    if(lastReal!==null) tick(ts-lastReal);
-    lastReal=ts;
-    animId=requestAnimationFrame(loop);
+    if(lastReal !== null) tick(ts - lastReal);
+    lastReal = ts;
+    animId = requestAnimationFrame(loop);
   }
 
+  /* ── read params ──────────────────────────────────────────────── */
   function readParams(){
-    N     = Math.max(1,Math.min(12,parseInt(document.getElementById('p-n').value)||4));
-    T_DIE = Math.max(10,parseInt(document.getElementById('p-die').value)||410);
-    T_EAT = Math.max(5, parseInt(document.getElementById('p-eat').value)||200);
-    T_SLP = Math.max(5, parseInt(document.getElementById('p-slp').value)||200);
+    N     = Math.max(1, Math.min(12, parseInt(document.getElementById('p-n').value)  ||5));
+    T_DIE = Math.max(10, parseInt(document.getElementById('p-die').value) ||155);
+    T_EAT = Math.max(5,  parseInt(document.getElementById('p-eat').value) ||100);
+    T_SLP = Math.max(5,  parseInt(document.getElementById('p-slp').value) || 50);
   }
 
-  function setStatus(txt,col){
-    const el=document.getElementById('s-status');
-    el.textContent=txt; el.style.color=col||'var(--color-text-secondary)';
+  function setStatus(txt, col){
+    const el = document.getElementById('s-status');
+    el.textContent = txt; el.style.color = col || 'var(--color-text-secondary)';
   }
 
-  document.getElementById('btn-start').onclick=function(){
+  /* ── controls ─────────────────────────────────────────────────── */
+  document.getElementById('btn-start').onclick = function(){
     if(dead) return;
-    if(!running){ running=true; lastReal=null; setStatus('running','#1D9E75'); animId=requestAnimationFrame(loop); }
+    if(!running){
+      running = true; lastReal = null;
+      setStatus('running','#1D9E75');
+      animId = requestAnimationFrame(loop);
+    }
   };
-  document.getElementById('btn-pause').onclick=function(){
-    running=false; if(animId) cancelAnimationFrame(animId); lastReal=null; setStatus('paused','#EF9F27');
+  document.getElementById('btn-pause').onclick = function(){
+    running = false;
+    if(animId) cancelAnimationFrame(animId);
+    lastReal = null;
+    setStatus('paused','#EF9F27');
   };
-  document.getElementById('btn-reset').onclick=function(){
-    running=false; if(animId) cancelAnimationFrame(animId); setStatus('stopped'); initSim();
+  document.getElementById('btn-reset').onclick = function(){
+    running = false;
+    if(animId) cancelAnimationFrame(animId);
+    setStatus('stopped');
+    initSim();
   };
-  document.getElementById('apply-btn').onclick=function(){
-    running=false; if(animId) cancelAnimationFrame(animId); readParams(); setStatus('stopped'); initSim();
+  document.getElementById('apply-btn').onclick = function(){
+    running = false;
+    if(animId) cancelAnimationFrame(animId);
+    readParams();
+    setStatus('stopped');
+    initSim();
   };
-  document.getElementById('speed').oninput=function(){
-    const s=parseInt(this.value);
-    const m=s<=5?s*0.25:(s-4)*1.0;
-    document.getElementById('speed-out').textContent=m+'×';
+  document.getElementById('speed').oninput = function(){
+    const s = parseInt(this.value);
+    const m = s <= 5 ? s*0.25 : (s-4)*1.0;
+    document.getElementById('speed-out').textContent = m+'×';
   };
   document.getElementById('speed').oninput();
 
