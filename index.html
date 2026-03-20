@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dining Philosophers</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f5f4f0;
+    --color-background-tertiary: #eeede8;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #73726c;
+    --color-text-tertiary: #9c9a92;
+    --color-border-tertiary: rgba(0,0,0,0.1);
+    --color-border-secondary: rgba(0,0,0,0.18);
+    --color-border-primary: rgba(0,0,0,0.3);
+    --font-sans: system-ui, -apple-system, sans-serif;
+    --font-mono: "Fira Code", "Cascadia Code", monospace;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background-primary: #1e1e1c;
+      --color-background-secondary: #2a2a28;
+      --color-background-tertiary: #222220;
+      --color-text-primary: #e8e6df;
+      --color-text-secondary: #9c9a92;
+      --color-text-tertiary: #73726c;
+      --color-border-tertiary: rgba(255,255,255,0.08);
+      --color-border-secondary: rgba(255,255,255,0.15);
+      --color-border-primary: rgba(255,255,255,0.25);
+    }
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-background-tertiary);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  #app {
+    background: var(--color-background-primary);
+    border-radius: var(--border-radius-lg);
+    border: 0.5px solid var(--color-border-tertiary);
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 620px;
+  }
+  h1 {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin-bottom: 1.25rem;
+  }
+  h1 code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: var(--color-background-secondary);
+    padding: 2px 7px;
+    border-radius: 5px;
+    color: var(--color-text-secondary);
+  }
+  .section-label {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .params-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .param-block {
+    background: var(--color-background-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 8px 12px;
+  }
+  .param-block label {
+    display: block;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+  }
+  .param-block input[type=number] {
+    width: 100%;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    background: var(--color-background-primary);
+    outline: none;
+    font-family: var(--font-sans);
+  }
+  .param-block input[type=number]:focus {
+    border-color: var(--color-border-primary);
+  }
+  .stats-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--color-background-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 8px 14px;
+    flex: 1;
+    min-width: 80px;
+  }
+  .stat-card .label { font-size: 11px; color: var(--color-text-secondary); }
+  .stat-card .val { font-size: 20px; font-weight: 500; color: var(--color-text-primary); }
+  .controls-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .controls-row button {
+    padding: 6px 16px;
+    font-size: 13px;
+    border-radius: var(--border-radius-md);
+    border: 0.5px solid var(--color-border-secondary);
+    background: var(--color-background-primary);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    white-space: nowrap;
+  }
+  .controls-row button:hover { background: var(--color-background-secondary); }
+  .controls-row button.primary { border-color: #1D9E75; color: #0F6E56; }
+  #apply-btn {
+    background: #E1F5EE; color: #0F6E56;
+    border-color: #5DCAA5; font-weight: 500;
+  }
+  #apply-btn:hover { background: #9FE1CB; }
+  .speed-wrap {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--color-text-secondary); margin-left: auto;
+  }
+  canvas { display: block; margin: 0 auto 12px; }
+  #log-box {
+    height: 150px; overflow-y: auto;
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-md);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+  }
+  #log-box div { line-height: 1.7; }
+  .l-die   { color: #E24B4A; }
+  .l-eat   { color: #1D9E75; }
+  .l-fork  { color: #378ADD; }
+  .l-sleep { color: #7F77DD; }
+  .l-think { color: var(--color-text-tertiary); }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Dining Philosophers &nbsp;<code>./philo N ttd tte tts</code></h1>
+
+  <div class="section-label">Parameters</div>
+  <div class="params-grid">
+    <div class="param-block">
+      <label>number of philosophers</label>
+      <input type="number" id="p-n" value="5" min="1" max="12">
+    </div>
+    <div class="param-block">
+      <label>time to die (ms)</label>
+      <input type="number" id="p-die" value="155" min="10" max="5000">
+    </div>
+    <div class="param-block">
+      <label>time to eat (ms)</label>
+      <input type="number" id="p-eat" value="100" min="5" max="2000">
+    </div>
+    <div class="param-block">
+      <label>time to sleep (ms)</label>
+      <input type="number" id="p-slp" value="50" min="5" max="2000">
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <button id="btn-start" class="primary">Start</button>
+    <button id="btn-pause">Pause</button>
+    <button id="btn-reset">Reset</button>
+    <button id="apply-btn">Apply &amp; Restart</button>
+    <div class="speed-wrap">
+      Speed&nbsp;
+      <input type="range" id="speed" min="1" max="10" value="2" step="1" style="width:72px">
+      <span id="speed-out" style="min-width:28px;font-weight:500;color:var(--color-text-primary)">0.5×</span>
+    </div>
+  </div>
+
+  <canvas id="c" width="560" height="380"></canvas>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="label">elapsed</div><div class="val" id="s-time">0 ms</div></div>
+    <div class="stat-card"><div class="label">meals total</div><div class="val" id="s-meals">0</div></div>
+    <div class="stat-card"><div class="label">status</div><div class="val" id="s-status" style="font-size:14px;padding-top:4px">stopped</div></div>
+  </div>
+
+  <div class="section-label" style="margin-top:12px">Log</div>
+  <div id="log-box"></div>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const CX = W/2, CY = H/2 - 4;
+
+  const SLABEL = ['thinking','waiting','eating','sleeping','DIED'];
+  const SCOLOR = ['#888780','#378ADD','#1D9E75','#7F77DD','#E24B4A'];
+  const SBG_L  = ['#F1EFE8','#E6F1FB','#E1F5EE','#EEEDFE','#FCEBEB'];
+  const SBG_D  = ['#2C2C2A','#042C53','#04342C','#26215C','#501313'];
+
+  let N=5, T_DIE=155, T_EAT=100, T_SLP=50;
+  let simTime=0, lastReal=null, running=false, dead=false, animId=null;
+  let totalMeals=0;
+  let philos=[], forks=[];
+
+  function speedMult(){
+    const s = parseInt(document.getElementById('speed').value);
+    return s <= 5 ? s * 0.25 : (s - 4) * 1.0;
+  }
+  function angleOf(i){ return -Math.PI/2 + 2*Math.PI*i/N; }
+  function R_TABLE(){ return Math.min(110, 80 + (12-N)*4); }
+  function R_PHILO(){ return R_TABLE()+40; }
+  function R_FORK_R(){ return R_TABLE()-28; }
+
+  function initSim(){
+    simTime=0; lastReal=null; running=false; dead=false; totalMeals=0;
+    document.getElementById('log-box').innerHTML='';
+    forks = Array.from({length:N},(_,i)=>({held:false,holder:-1,i}));
+    philos = Array.from({length:N},(_,i)=>{
+      const a=angleOf(i);
+      return { id:i+1, state:0, stateTimer:0, lastMeal:0, meals:0, angle:a, pulseT:0,
+               x:CX+R_PHILO()*Math.cos(a), y:CY+R_PHILO()*Math.sin(a) };
+    });
+    updateStats(); render();
+  }
+
+  function addLog(ms,id,msg,cls){
+    const box=document.getElementById('log-box');
+    const d=document.createElement('div');
+    d.className=cls;
+    d.textContent=Math.round(ms)+'ms  '+id+'  '+msg;
+    box.appendChild(d);
+    if(box.children.length>300) box.removeChild(box.firstChild);
+    box.scrollTop=box.scrollHeight;
+  }
+
+  function forkL(i){ return (i+N-1)%N; }
+  function forkR(i){ return i; }
+
+  function tick(dtReal){
+    if(dead) return;
+    const dt=dtReal*speedMult();
+    simTime+=dt;
+
+    philos.forEach((p,i)=>{
+      if(p.state===4) return;
+      p.stateTimer+=dt; p.pulseT+=dt;
+
+      if(simTime-p.lastMeal >= T_DIE){
+        p.state=4; dead=true; running=false;
+        addLog(simTime,p.id,'died','l-die');
+        forks[forkL(i)].held=false; forks[forkR(i)].held=false;
+        const ss=document.getElementById('s-status');
+        ss.textContent='died'; ss.style.color='#E24B4A';
+        return;
+      }
+
+      if(p.state===0||p.state===1){
+        const fl=forkL(i), fr=forkR(i);
+        if(!forks[fl].held&&!forks[fr].held){
+          forks[fl].held=true; forks[fr].held=true;
+          p.state=2; p.stateTimer=0; p.lastMeal=simTime;
+          addLog(simTime,p.id,'has taken a fork','l-fork');
+          addLog(simTime,p.id,'has taken a fork','l-fork');
+          addLog(simTime,p.id,'is eating','l-eat');
+        } else { p.state=1; }
+      } else if(p.state===2&&p.stateTimer>=T_EAT){
+        forks[forkL(i)].held=false; forks[forkR(i)].held=false;
+        p.meals++; totalMeals++;
+        p.state=3; p.stateTimer=0;
+        addLog(simTime,p.id,'is sleeping','l-sleep');
+      } else if(p.state===3&&p.stateTimer>=T_SLP){
+        p.state=0; p.stateTimer=0;
+        addLog(simTime,p.id,'is thinking','l-think');
+      }
+    });
+
+    updateStats(); render();
+  }
+
+  function updateStats(){
+    document.getElementById('s-time').textContent=Math.round(simTime)+' ms';
+    document.getElementById('s-meals').textContent=totalMeals;
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    const dark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+    const tFill  =dark?'#2C2C2A':'#F1EFE8';
+    const tStroke=dark?'#5F5E5A':'#B4B2A9';
+    const tSec   =dark?'#9c9a92':'#73726c';
+    const RT=R_TABLE(), RP=R_PHILO(), RF=R_FORK_R();
+
+    ctx.beginPath(); ctx.arc(CX,CY,RT,0,Math.PI*2);
+    ctx.fillStyle=tFill; ctx.fill();
+    ctx.strokeStyle=tStroke; ctx.lineWidth=1; ctx.stroke();
+    ctx.font='14px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('🍝',CX,CY);
+
+    forks.forEach((f,i)=>{
+      const aL=angleOf(i), aR=angleOf((i+1)%N);
+      let aM=(aL+aR)/2;
+      if(Math.abs(aR-aL)>Math.PI) aM+=Math.PI;
+      const fx=CX+RF*Math.cos(aM), fy=CY+RF*Math.sin(aM);
+      ctx.save(); ctx.translate(fx,fy); ctx.rotate(aM+Math.PI/2);
+      const fc=f.held?'#1D9E75':(dark?'#5F5E5A':'#B4B2A9');
+      ctx.strokeStyle=fc; ctx.lineWidth=f.held?2.5:1.5; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(0,9); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-3,-9); ctx.lineTo(-3,-2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(3,-9); ctx.lineTo(3,-2); ctx.stroke();
+      ctx.restore();
+    });
+
+    philos.forEach((p,i)=>{
+      const pulse=p.state===2?1+0.07*Math.sin(p.pulseT/60):1;
+      const r=20*pulse;
+      const bg=dark?SBG_D[p.state]:SBG_L[p.state];
+      const bc=SCOLOR[p.state];
+
+      ctx.beginPath(); ctx.arc(p.x,p.y,r+2.5,0,Math.PI*2);
+      ctx.fillStyle=bc; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
+      ctx.fillStyle=bg; ctx.fill();
+
+      const hunger=Math.max(0,1-(simTime-p.lastMeal)/T_DIE);
+      const barW=34, bx=p.x-barW/2, by=p.y-r-8;
+      ctx.fillStyle=dark?'#444441':'#D3D1C7';
+      ctx.fillRect(bx,by,barW,3);
+      const hc=hunger<0.25?'#E24B4A':hunger<0.5?'#EF9F27':'#1D9E75';
+      ctx.fillStyle=hc;
+      ctx.fillRect(bx,by,barW*hunger,3);
+
+      if(p.state===2){
+        const prog=Math.min(1,p.stateTimer/T_EAT);
+        ctx.fillStyle=dark?'#444441':'#D3D1C7';
+        ctx.fillRect(bx,by+6,barW,2);
+        ctx.fillStyle='#1D9E75';
+        ctx.fillRect(bx,by+6,barW*prog,2);
+      } else if(p.state===1){
+        const sz=Math.sin(p.pulseT/120)*0.5+0.5;
+        ctx.fillStyle=dark?'#444441':'#D3D1C7';
+        ctx.fillRect(bx,by+6,barW,2);
+        ctx.fillStyle='#378ADD';
+        ctx.fillRect(bx,by+6,barW*sz,2);
+      }
+
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font=`500 ${N>8?10:12}px var(--font-sans,sans-serif)`;
+      ctx.fillStyle=bc;
+      ctx.fillText(p.id,p.x,p.y-3);
+      ctx.font=`400 9px var(--font-sans,sans-serif)`;
+      ctx.fillText(SLABEL[p.state],p.x,p.y+8);
+    });
+
+    if(dead){
+      ctx.font='500 13px var(--font-sans,sans-serif)';
+      ctx.textAlign='center'; ctx.fillStyle='#E24B4A';
+      ctx.fillText('Simulation ended — a philosopher died',CX,CY+RT+26);
+    }
+  }
+
+  function loop(ts){
+    if(!running) return;
+    if(lastReal!==null) tick(ts-lastReal);
+    lastReal=ts;
+    animId=requestAnimationFrame(loop);
+  }
+
+  function readParams(){
+    N     = Math.max(1,Math.min(12,parseInt(document.getElementById('p-n').value)||5));
+    T_DIE = Math.max(10,parseInt(document.getElementById('p-die').value)||155);
+    T_EAT = Math.max(5, parseInt(document.getElementById('p-eat').value)||100);
+    T_SLP = Math.max(5, parseInt(document.getElementById('p-slp').value)||50);
+  }
+
+  function setStatus(txt,col){
+    const el=document.getElementById('s-status');
+    el.textContent=txt; el.style.color=col||'var(--color-text-secondary)';
+  }
+
+  document.getElementById('btn-start').onclick=function(){
+    if(dead) return;
+    if(!running){ running=true; lastReal=null; setStatus('running','#1D9E75'); animId=requestAnimationFrame(loop); }
+  };
+  document.getElementById('btn-pause').onclick=function(){
+    running=false; if(animId) cancelAnimationFrame(animId); lastReal=null; setStatus('paused','#EF9F27');
+  };
+  document.getElementById('btn-reset').onclick=function(){
+    running=false; if(animId) cancelAnimationFrame(animId); setStatus('stopped'); initSim();
+  };
+  document.getElementById('apply-btn').onclick=function(){
+    running=false; if(animId) cancelAnimationFrame(animId); readParams(); setStatus('stopped'); initSim();
+  };
+  document.getElementById('speed').oninput=function(){
+    const s=parseInt(this.value);
+    const m=s<=5?s*0.25:(s-4)*1.0;
+    document.getElementById('speed-out').textContent=m+'×';
+  };
+  document.getElementById('speed').oninput();
+
+  initSim();
+})();
+</script>
+</body>
+</html>
