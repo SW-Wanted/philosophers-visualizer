@@ -176,15 +176,15 @@
     </div>
     <div class="param-block">
       <label>time to die (ms)</label>
-      <input type="number" id="p-die" value="155" min="10" max="5000">
+      <input type="number" id="p-die" value="410" min="10" max="5000">
     </div>
     <div class="param-block">
       <label>time to eat (ms)</label>
-      <input type="number" id="p-eat" value="100" min="5" max="2000">
+      <input type="number" id="p-eat" value="200" min="5" max="2000">
     </div>
     <div class="param-block">
       <label>time to sleep (ms)</label>
-      <input type="number" id="p-slp" value="50" min="5" max="2000">
+      <input type="number" id="p-slp" value="200" min="5" max="2000">
     </div>
   </div>
 
@@ -224,7 +224,7 @@
   const SBG_L  = ['#F1EFE8','#E6F1FB','#E1F5EE','#EEEDFE','#FCEBEB'];
   const SBG_D  = ['#2C2C2A','#042C53','#04342C','#26215C','#501313'];
 
-  let N=5, T_DIE=155, T_EAT=100, T_SLP=50;
+  let N=5, T_DIE=410, T_EAT=200, T_SLP=200;
   let simTime=0, lastReal=null, running=false, dead=false, animId=null;
   let totalMeals=0;
   let philos=[], forks=[];
@@ -232,7 +232,7 @@
   /* ── speed multiplier ─────────────────────────────────────────── */
   function speedMult(){
     const s = parseInt(document.getElementById('speed').value);
-    return s <= 5 ? s * 0.25 : (s - 4) * 1.0;
+    return s <= 4 ? s * 0.25 : (s - 4) * 1.0;
   }
 
   /* ── geometry ─────────────────────────────────────────────────── */
@@ -307,8 +307,8 @@
     /*
      * FIX 1 — subdivide each frame into 1 ms subticks.
      * requestAnimationFrame fires ~every 16.7 ms.
-     * With T_DIE=155, T_EAT=100, T_SLP=50, the survival window
-     * is only 5 ms — invisible at 16.7 ms resolution.
+     * With T_DIE=410, T_EAT=200, T_SLP=200, the survival window
+     * is only 4 ms — invisible at 16.7 ms resolution.
      * By running steps of 1 ms we never skip over that window.
      */
     for(let s = 0; s < steps; s++){
@@ -492,10 +492,10 @@
 
   /* ── read params ──────────────────────────────────────────────── */
   function readParams(){
-    N     = Math.max(1, Math.min(12, parseInt(document.getElementById('p-n').value)  ||5));
-    T_DIE = Math.max(10, parseInt(document.getElementById('p-die').value) ||155);
-    T_EAT = Math.max(5,  parseInt(document.getElementById('p-eat').value) ||100);
-    T_SLP = Math.max(5,  parseInt(document.getElementById('p-slp').value) || 50);
+    N     = Math.max(1, Math.min(12, parseInt(document.getElementById('p-n').value)  ||4));
+    T_DIE = Math.max(10, parseInt(document.getElementById('p-die').value) ||410);
+    T_EAT = Math.max(5,  parseInt(document.getElementById('p-eat').value) ||200);
+    T_SLP = Math.max(5,  parseInt(document.getElementById('p-slp').value) || 200);
   }
 
   function setStatus(txt, col){
