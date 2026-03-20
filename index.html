@@ -224,7 +224,7 @@
   const SBG_L  = ['#F1EFE8','#E6F1FB','#E1F5EE','#EEEDFE','#FCEBEB'];
   const SBG_D  = ['#2C2C2A','#042C53','#04342C','#26215C','#501313'];
 
-  let N=5, T_DIE=410, T_EAT=200, T_SLP=200;
+  let N=4, T_DIE=410, T_EAT=200, T_SLP=200;
   let simTime=0, lastReal=null, running=false, dead=false, animId=null;
   let totalMeals=0;
   let philos=[], forks=[];
@@ -492,9 +492,9 @@
 
   /* ── read params ──────────────────────────────────────────────── */
   function readParams(){
-    N     = Math.max(1, Math.min(12, parseInt(document.getElementById('p-n').value)  ||4));
-    T_DIE = Math.max(10, parseInt(document.getElementById('p-die').value) ||410);
-    T_EAT = Math.max(5,  parseInt(document.getElementById('p-eat').value) ||200);
+    N     = Math.max(1, Math.min(12, parseInt(document.getElementById('p-n').value)  || 4));
+    T_DIE = Math.max(10, parseInt(document.getElementById('p-die').value) || 410);
+    T_EAT = Math.max(5,  parseInt(document.getElementById('p-eat').value) || 200);
     T_SLP = Math.max(5,  parseInt(document.getElementById('p-slp').value) || 200);
   }
 
